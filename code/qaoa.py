@@ -4,11 +4,11 @@ from kernel_functions import *
 
 
 def qaoa_maximize(n, H_C, callback=None, level=0):
-    '''
-        compute the highest energy of H_C
-        and in qaoa this is done by computing the ground energy of -H_C
-        params = (beta, gamma)
-    '''
+    """
+    compute the highest energy of H_C
+    and in qaoa this is done by computing the ground energy of -H_C
+    params = (beta, gamma)
+    """
     assert cuda.is_cuda_array(H_C)
 
     if level == 0:
@@ -17,12 +17,13 @@ def qaoa_maximize(n, H_C, callback=None, level=0):
         p = 2 * n
 
     def compute_x_sum(s):
-        @ cuda.jit
+        @cuda.jit
         def compute_x_sum_kernel(s):
             x = cuda.grid(1)
             s[x] = 0
             for i in range(n):
                 s[x] += -1 if x >> i & 1 else 1
+
         compute_x_sum_kernel[get_grid(1 << n)](s)
 
     def phase_shift(s, k, p):
@@ -53,7 +54,7 @@ def qaoa_maximize(n, H_C, callback=None, level=0):
         for h in range(n):
             fwht_step_kernel[get_grid(1 << (n - 1))](a, h)
 
-    logger.info('inside QAOA')
+    logger.info("inside QAOA")
 
     H_B_computational_basis = cuda.device_array(2**n, dtype=np.int8)
     compute_x_sum(H_B_computational_basis)
@@ -62,7 +63,7 @@ def qaoa_maximize(n, H_C, callback=None, level=0):
 
     def compute_qaoa_state(state, x):
         # putting kernel function inside results in repeated compiling
-        assign_constant(state, 1 / 2**(n / 2))
+        assign_constant(state, 1 / 2 ** (n / 2))
         p = len(x) // 2
         for i in range(p):
             b, g = x[i], x[i + p]
@@ -70,7 +71,7 @@ def qaoa_maximize(n, H_C, callback=None, level=0):
             fwht(state)
             phase_shift(state, -1j * b, H_B_computational_basis)
             fwht(state)
-            multiply_by_constant(state, 1. / len(state))
+            multiply_by_constant(state, 1.0 / len(state))
 
     def variational_expectation(x):
         compute_qaoa_state(state, x)
@@ -84,10 +85,17 @@ def qaoa_maximize(n, H_C, callback=None, level=0):
         def print_step(x):
             nonlocal step_cnt
             if step_cnt % 10 == 0:
-                logger.info(f'#{step_cnt}: {callback(variational_expectation(x))}')
+                logger.info(f"#{step_cnt}: {callback(variational_expectation(x))}")
             step_cnt += 1
 
-        res = BFGS(variational_expectation, arg_policy(p, T), full_output=1, disp=0, callback=print_step, maxiter=maxiter)
+        res = BFGS(
+            variational_expectation,
+            arg_policy(p, T),
+            full_output=1,
+            disp=0,
+            callback=print_step,
+            maxiter=maxiter,
+        )
 
         return (res[1], res[0])
 
