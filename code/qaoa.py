@@ -3,6 +3,23 @@ from init_policy import *
 from kernel_functions import *
 
 
+@cuda.reduce
+def max_reduce(a, b):
+    return max(a, b)
+
+
+@cuda.reduce
+def min_reduce(a, b):
+    return min(a, b)
+
+
+def shortcut(n, H_C, approx):
+    # assuming the approximation ratio is approx
+    max_value = max_reduce(H_C)
+    min_value = min_reduce(H_C)
+
+    return (min_value + approx * (max_value - min_value), None)
+
 def qaoa_maximize(n, H_C, callback=None, level=0):
     """
     compute the highest energy of H_C
